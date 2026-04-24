@@ -1,0 +1,2719 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>长征数字地图 · 红色记忆</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+
+  :root {
+    --red-primary: #c0392b;
+    --red-dark: #922b21;
+    --red-light: #e74c3c;
+    --gold: #d4a017;
+    --gold-light: #f1c40f;
+    --dark-bg: #0d1117;
+    --panel-bg: rgba(13,17,23,0.96);
+    --text-light: #e8d5b7;
+    --border: rgba(212,160,23,0.3);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Sans SC', sans-serif;
+    background: var(--dark-bg);
+    color: var(--text-light);
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  /* ===== HEADER ===== */
+  #header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 1000;
+    background: linear-gradient(135deg, rgba(13,17,23,0.98) 0%, rgba(30,10,10,0.98) 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    backdrop-filter: blur(10px);
+  }
+
+  .header-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .title-icon {
+    width: 36px;
+    height: 36px;
+    background: var(--red-primary);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  .title-text {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 20px;
+    font-weight: 700;
+    background: linear-gradient(90deg, #f1c40f, #e74c3c);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .title-sub {
+    font-size: 11px;
+    color: rgba(232,213,183,0.6);
+    margin-left: 8px;
+    font-weight: 300;
+    letter-spacing: 2px;
+  }
+
+  .header-nav {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .nav-btn {
+    padding: 5px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-light);
+    transition: all 0.2s;
+    font-family: 'Noto Sans SC', sans-serif;
+  }
+  .nav-btn:hover, .nav-btn.active {
+    background: var(--red-primary);
+    border-color: var(--red-primary);
+    color: white;
+  }
+
+  /* ===== MAP ===== */
+  #map {
+    position: fixed;
+    top: 56px;
+    left: 280px;
+    right: 0;
+    bottom: 140px;
+    z-index: 1;
+  }
+
+  /* ===== LEFT PANEL ===== */
+  #left-panel {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    width: 280px;
+    bottom: 140px;
+    z-index: 500;
+    background: var(--panel-bg);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  #left-panel::-webkit-scrollbar { width: 4px; }
+  #left-panel::-webkit-scrollbar-track { background: transparent; }
+  #left-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .panel-section {
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(212,160,23,0.1);
+  }
+
+  .panel-section-title {
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* LAYERS */
+  .layer-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 0;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .layer-item:hover .layer-label { color: var(--gold-light); }
+
+  .layer-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .layer-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .layer-label {
+    font-size: 13px;
+    color: var(--text-light);
+    transition: color 0.2s;
+  }
+
+  .toggle-switch {
+    width: 32px;
+    height: 18px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 9px;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.3s;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+
+  .toggle-switch.on {
+    background: var(--red-primary);
+    border-color: var(--red-primary);
+  }
+
+  .toggle-switch::after {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    background: white;
+    border-radius: 50%;
+    top: 1px;
+    left: 1px;
+    transition: all 0.3s;
+  }
+
+  .toggle-switch.on::after { left: 15px; }
+
+  /* ARMY FILTER */
+  .army-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-bottom: 4px;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+    font-size: 12px;
+  }
+
+  .army-btn.active { border-color: var(--border); background: rgba(212,160,23,0.08); }
+  .army-btn:hover { background: rgba(212,160,23,0.05); }
+
+  .army-color {
+    width: 24px;
+    height: 4px;
+    border-radius: 2px;
+  }
+
+  /* PEOPLE */
+  .person-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+    margin-bottom: 4px;
+  }
+
+  .person-card:hover, .person-card.active {
+    background: rgba(192,57,43,0.15);
+    border-color: rgba(192,57,43,0.4);
+  }
+
+  .person-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--red-dark);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+    border: 2px solid rgba(212,160,23,0.4);
+  }
+
+  .person-info { flex: 1; }
+  .person-name { font-size: 13px; font-weight: 500; color: var(--text-light); }
+  .person-role { font-size: 11px; color: rgba(232,213,183,0.5); }
+
+  /* SEARCH */
+  .search-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+  }
+
+  .search-box input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-light);
+    font-size: 13px;
+    width: 100%;
+    font-family: 'Noto Sans SC', sans-serif;
+  }
+
+  .search-box input::placeholder { color: rgba(232,213,183,0.3); }
+
+  /* ===== TIMELINE ===== */
+  #timeline-panel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 140px;
+    background: var(--panel-bg);
+    border-top: 1px solid var(--border);
+    z-index: 500;
+    padding: 12px 20px;
+  }
+
+  .timeline-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .timeline-title {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--gold);
+  }
+
+  .timeline-date {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 14px;
+    color: var(--red-light);
+    font-weight: 600;
+  }
+
+  .timeline-track {
+    position: relative;
+    height: 6px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 3px;
+    cursor: pointer;
+    margin-bottom: 8px;
+  }
+
+  .timeline-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #c0392b, #f39c12);
+    border-radius: 3px;
+    transition: width 0.1s;
+  }
+
+  .timeline-thumb {
+    position: absolute;
+    top: -5px;
+    width: 16px;
+    height: 16px;
+    background: white;
+    border-radius: 50%;
+    border: 3px solid var(--red-primary);
+    cursor: grab;
+    transform: translateX(-50%);
+    transition: left 0.1s;
+    box-shadow: 0 0 0 3px rgba(192,57,43,0.3);
+  }
+
+  .timeline-events {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .timeline-events::-webkit-scrollbar { height: 2px; }
+  .timeline-events::-webkit-scrollbar-thumb { background: var(--border); border-radius: 1px; }
+
+  .tl-event {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    color: rgba(232,213,183,0.7);
+  }
+
+  .tl-event:hover, .tl-event.active {
+    background: rgba(192,57,43,0.25);
+    border-color: var(--red-primary);
+    color: var(--text-light);
+  }
+
+  .tl-event .tl-date { font-size: 10px; color: var(--gold); display: block; }
+
+  .timeline-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .ctrl-btn {
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-light);
+    transition: all 0.2s;
+  }
+
+  .ctrl-btn:hover { background: var(--red-primary); border-color: var(--red-primary); }
+
+  /* ===== POPUP ===== */
+  #event-popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2000;
+    width: 680px;
+    max-width: 95vw;
+    max-height: 85vh;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    display: none;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.7);
+  }
+
+  #event-popup.show { display: block; animation: popIn 0.3s ease; }
+
+  @keyframes popIn {
+    from { opacity: 0; transform: translate(-50%, -48%) scale(0.95); }
+    to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  }
+
+  .popup-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 1999;
+    display: none;
+  }
+
+  .popup-overlay.show { display: block; }
+
+  .popup-header {
+    background: linear-gradient(135deg, var(--red-dark), #1a1a2e);
+    padding: 16px 20px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .popup-title {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 4px;
+  }
+
+  .popup-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.6);
+    flex-wrap: wrap;
+  }
+
+  .popup-meta span { display: flex; align-items: center; gap: 4px; }
+
+  .popup-close {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.1);
+    border: none;
+    cursor: pointer;
+    color: white;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s;
+  }
+
+  .popup-close:hover { background: var(--red-primary); }
+
+  .popup-body {
+    padding: 18px 20px;
+    overflow-y: auto;
+    max-height: calc(85vh - 100px);
+  }
+
+  .popup-body::-webkit-scrollbar { width: 4px; }
+  .popup-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .popup-images {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .popup-img-wrap {
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    aspect-ratio: 4/3;
+    background: rgba(255,255,255,0.03);
+    position: relative;
+  }
+
+  .popup-img-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s;
+  }
+
+  .popup-img-wrap:hover img { transform: scale(1.03); }
+
+  .img-caption {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(0deg, rgba(0,0,0,0.8), transparent);
+    padding: 6px 8px 4px;
+    font-size: 10px;
+    color: rgba(255,255,255,0.7);
+  }
+
+  .popup-desc {
+    font-size: 13px;
+    line-height: 1.9;
+    color: rgba(232,213,183,0.85);
+    margin-bottom: 14px;
+  }
+
+  .popup-significance {
+    background: rgba(192,57,43,0.1);
+    border: 1px solid rgba(192,57,43,0.3);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+  }
+
+  .popup-significance-title {
+    font-size: 11px;
+    color: var(--red-light);
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+
+  .popup-significance p {
+    font-size: 12px;
+    color: rgba(232,213,183,0.8);
+    line-height: 1.7;
+    margin: 0;
+  }
+
+  .popup-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .popup-tag {
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    background: rgba(212,160,23,0.12);
+    border: 1px solid rgba(212,160,23,0.25);
+    color: var(--gold);
+  }
+
+  /* ===== BATTLE MODAL ===== */
+  #battle-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.85);
+  }
+
+  #battle-modal.show { display: flex; }
+
+  .battle-content {
+    width: 700px;
+    max-width: 95vw;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    max-height: 88vh;
+    overflow-y: auto;
+  }
+
+  .battle-header {
+    background: linear-gradient(135deg, #1a0a0a, #2d1515);
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+  }
+
+  .battle-title {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--gold-light);
+    margin-bottom: 6px;
+  }
+
+  .battle-subtitle {
+    font-size: 12px;
+    color: rgba(232,213,183,0.5);
+    letter-spacing: 2px;
+  }
+
+  .battle-body { padding: 20px; }
+
+  .battle-map {
+    width: 100%;
+    height: 200px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .battle-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .battle-step {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .battle-step:hover, .battle-step.active {
+    background: rgba(192,57,43,0.12);
+    border-color: rgba(192,57,43,0.35);
+  }
+
+  .step-num {
+    width: 28px;
+    height: 28px;
+    background: var(--red-primary);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+  }
+
+  .step-content { flex: 1; }
+  .step-title { font-size: 13px; font-weight: 600; color: var(--text-light); margin-bottom: 4px; }
+  .step-desc { font-size: 12px; color: rgba(232,213,183,0.6); line-height: 1.6; }
+
+  .battle-close {
+    display: block;
+    margin: 16px auto 0;
+    padding: 8px 24px;
+    background: var(--red-primary);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: 'Noto Sans SC', sans-serif;
+    transition: all 0.2s;
+  }
+
+  .battle-close:hover { background: var(--red-dark); }
+
+  /* ===== LEGEND ===== */
+  #legend {
+    position: fixed;
+    bottom: 148px;
+    right: 12px;
+    z-index: 600;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 11px;
+  }
+
+  .legend-title {
+    color: var(--gold);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    margin-bottom: 8px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+  }
+
+  .legend-line {
+    width: 24px;
+    height: 3px;
+    border-radius: 2px;
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  /* ===== STATS ===== */
+  #stats-bar {
+    position: fixed;
+    top: 64px;
+    right: 12px;
+    z-index: 600;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .stat-card {
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    text-align: center;
+    min-width: 80px;
+  }
+
+  .stat-value {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--gold-light);
+  }
+
+  .stat-label {
+    font-size: 10px;
+    color: rgba(232,213,183,0.5);
+    margin-top: 2px;
+  }
+
+  /* ===== LEAFLET CUSTOM ===== */
+  .leaflet-container { background: #1a1a2e !important; }
+
+  .custom-marker {
+    cursor: pointer;
+  }
+
+  .custom-icon {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2px solid white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    transition: transform 0.2s;
+  }
+
+  .custom-icon:hover { transform: scale(1.2); }
+
+  .leaflet-popup-content-wrapper {
+    background: var(--panel-bg) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 8px !important;
+    color: var(--text-light) !important;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6) !important;
+    padding: 0 !important;
+  }
+
+  .leaflet-popup-content {
+    margin: 0 !important;
+    padding: 12px 14px !important;
+    min-width: 180px;
+  }
+
+  .leaflet-popup-tip { background: var(--panel-bg) !important; }
+
+  .leaflet-popup-close-button {
+    color: rgba(232,213,183,0.7) !important;
+    font-size: 18px !important;
+    top: 6px !important;
+    right: 8px !important;
+  }
+
+  .lp-title {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--gold-light);
+    margin-bottom: 6px;
+  }
+
+  .lp-date { font-size: 11px; color: rgba(232,213,183,0.55); margin-bottom: 6px; }
+  .lp-desc { font-size: 12px; color: rgba(232,213,183,0.8); line-height: 1.6; margin-bottom: 8px; }
+
+  .lp-btn {
+    display: inline-block;
+    padding: 5px 12px;
+    background: var(--red-primary);
+    border-radius: 4px;
+    font-size: 11px;
+    color: white;
+    cursor: pointer;
+    border: none;
+    font-family: 'Noto Sans SC', sans-serif;
+    transition: all 0.2s;
+  }
+
+  .lp-btn:hover { background: var(--red-dark); }
+
+  /* TOOLTIP */
+  .leaflet-tooltip {
+    background: rgba(13,17,23,0.92) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text-light) !important;
+    font-size: 11px !important;
+    border-radius: 4px !important;
+    font-family: 'Noto Sans SC', sans-serif !important;
+  }
+
+  /* Attribution */
+  .leaflet-control-attribution {
+    background: rgba(13,17,23,0.8) !important;
+    color: rgba(232,213,183,0.4) !important;
+    font-size: 9px !important;
+  }
+
+  .leaflet-control-attribution a { color: var(--gold) !important; }
+
+  /* Zoom */
+  .leaflet-control-zoom a {
+    background: var(--panel-bg) !important;
+    border-color: var(--border) !important;
+    color: var(--text-light) !important;
+  }
+
+  .leaflet-control-zoom a:hover { background: var(--red-primary) !important; }
+
+  /* NOTIFICATION */
+  #notification {
+    position: fixed;
+    top: 68px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1500;
+    background: rgba(192,57,43,0.9);
+    color: white;
+    padding: 8px 20px;
+    border-radius: 6px;
+    font-size: 13px;
+    display: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+
+  /* TECH PANEL */
+  #tech-panel {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    right: 0;
+    bottom: 140px;
+    z-index: 900;
+    background: var(--dark-bg);
+    display: none;
+    overflow-y: auto;
+    padding: 30px;
+  }
+
+  #tech-panel.show { display: block; }
+
+  #tech-panel::-webkit-scrollbar { width: 6px; }
+  #tech-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .tech-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .tech-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    transition: all 0.3s;
+  }
+
+  .tech-card:hover { border-color: var(--red-primary); }
+
+  .tech-card-icon { font-size: 28px; margin-bottom: 10px; }
+  .tech-card-title {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--gold-light);
+    margin-bottom: 10px;
+  }
+
+  .tech-card-content { font-size: 12px; color: rgba(232,213,183,0.75); line-height: 1.8; }
+
+  .tech-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    background: rgba(192,57,43,0.2);
+    border: 1px solid rgba(192,57,43,0.4);
+    border-radius: 3px;
+    font-size: 11px;
+    color: var(--red-light);
+    margin: 3px 2px 0 0;
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-top: 10px;
+  }
+
+  .data-table th {
+    background: rgba(192,57,43,0.2);
+    padding: 8px 10px;
+    text-align: left;
+    color: var(--gold);
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+  }
+
+  .data-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    color: rgba(232,213,183,0.8);
+    vertical-align: top;
+  }
+
+  .data-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .code-block {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    padding: 14px;
+    font-size: 11px;
+    font-family: 'Courier New', monospace;
+    color: #98c379;
+    overflow-x: auto;
+    line-height: 1.7;
+    margin-top: 10px;
+  }
+
+  .code-comment { color: #5c6370; }
+  .code-key { color: #e06c75; }
+  .code-string { color: #98c379; }
+  .code-num { color: #d19a66; }
+
+  .section-heading {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--gold-light);
+    margin-bottom: 6px;
+  }
+
+  .section-sub {
+    font-size: 13px;
+    color: rgba(232,213,183,0.5);
+    margin-bottom: 24px;
+    letter-spacing: 1px;
+  }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 30px 0;
+  }
+
+  /* ARMY PATH ANIMATION */
+  @keyframes dash {
+    to { stroke-dashoffset: -20; }
+  }
+
+  /* Loader */
+  #loader {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: var(--dark-bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.5s;
+  }
+
+  .loader-title {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 32px;
+    font-weight: 700;
+    background: linear-gradient(90deg, #f1c40f, #e74c3c);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+  }
+
+  .loader-sub {
+    font-size: 13px;
+    color: rgba(232,213,183,0.4);
+    letter-spacing: 3px;
+    margin-bottom: 30px;
+  }
+
+  .loader-bar {
+    width: 200px;
+    height: 3px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .loader-progress {
+    height: 100%;
+    background: linear-gradient(90deg, #c0392b, #f39c12);
+    border-radius: 2px;
+    animation: loadAnim 1.8s ease forwards;
+  }
+
+  @keyframes loadAnim {
+    from { width: 0%; }
+    to { width: 100%; }
+  }
+
+  .loader-stars {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .star {
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    background: rgba(241,196,15,0.5);
+    border-radius: 50%;
+    animation: twinkle 3s infinite alternate;
+  }
+
+  @keyframes twinkle {
+    from { opacity: 0.2; }
+    to { opacity: 1; }
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    #left-panel { width: 220px; }
+    #map { left: 0; bottom: 160px; top: 56px; }
+    #left-panel { display: none; }
+    #event-popup { width: 95vw; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="loader-stars" id="loader-stars"></div>
+  <div style="text-align:center; position:relative; z-index:1;">
+    <div style="font-size:48px; margin-bottom:12px;">🚩</div>
+    <div class="loader-title">长征数字地图</div>
+    <div class="loader-sub">RED ARMY LONG MARCH · 1934–1936</div>
+    <div class="loader-bar"><div class="loader-progress"></div></div>
+    <div style="margin-top:14px; font-size:12px; color:rgba(232,213,183,0.3); letter-spacing:2px;">加载历史数据中...</div>
+  </div>
+</div>
+
+<!-- NOTIFICATION -->
+<div id="notification"></div>
+
+<!-- HEADER -->
+<div id="header">
+  <div class="header-title">
+    <div class="title-icon">🚩</div>
+    <div>
+      <span class="title-text">长征数字地图</span>
+      <span class="title-sub">1934–1936</span>
+    </div>
+  </div>
+  <div class="header-nav">
+    <button class="nav-btn active" onclick="showView('map')">🗺️ 交互地图</button>
+    <button class="nav-btn" onclick="showView('tech')">📋 技术方案</button>
+    <button class="nav-btn" onclick="showView('data')">📊 数据清单</button>
+    <button class="nav-btn" onclick="showBattle('sidu')">⚔️ 四渡赤水</button>
+    <button class="nav-btn" onclick="showBattle('luding')">🌉 飞夺泸定桥</button>
+  </div>
+</div>
+
+<!-- LEFT PANEL -->
+<div id="left-panel">
+
+  <!-- Search -->
+  <div class="panel-section">
+    <div class="search-box">
+      <span>🔍</span>
+      <input type="text" id="search-input" placeholder="搜索事件、人物、地点..." oninput="handleSearch(this.value)"/>
+    </div>
+  </div>
+
+  <!-- Layers -->
+  <div class="panel-section">
+    <div class="panel-section-title">⚙️ 图层控制</div>
+    <div class="layer-item" onclick="toggleLayer('routes')">
+      <div class="layer-left">
+        <div class="layer-dot" style="background:#e74c3c;"></div>
+        <span class="layer-label">行军路线</span>
+      </div>
+      <div class="toggle-switch on" id="toggle-routes"></div>
+    </div>
+    <div class="layer-item" onclick="toggleLayer('events')">
+      <div class="layer-left">
+        <div class="layer-dot" style="background:#f39c12;"></div>
+        <span class="layer-label">历史事件</span>
+      </div>
+      <div class="toggle-switch on" id="toggle-events"></div>
+    </div>
+    <div class="layer-item" onclick="toggleLayer('battles')">
+      <div class="layer-left">
+        <div class="layer-dot" style="background:#e74c3c; border: 2px solid #c0392b;"></div>
+        <span class="layer-label">战役标注</span>
+      </div>
+      <div class="toggle-switch on" id="toggle-battles"></div>
+    </div>
+    <div class="layer-item" onclick="toggleLayer('people')">
+      <div class="layer-left">
+        <div class="layer-dot" style="background:#9b59b6;"></div>
+        <span class="layer-label">人物轨迹</span>
+      </div>
+      <div class="toggle-switch" id="toggle-people"></div>
+    </div>
+    <div class="layer-item" onclick="toggleLayer('geography')">
+      <div class="layer-left">
+        <div class="layer-dot" style="background:#27ae60;"></div>
+        <span class="layer-label">地理标注</span>
+      </div>
+      <div class="toggle-switch on" id="toggle-geography"></div>
+    </div>
+  </div>
+
+  <!-- Army Filter -->
+  <div class="panel-section">
+    <div class="panel-section-title">🚩 方面军筛选</div>
+    <div class="army-btn active" id="army-1" onclick="filterArmy(1)">
+      <div class="army-color" style="background:#e74c3c;"></div>
+      <span style="font-size:12px;">红一方面军</span>
+    </div>
+    <div class="army-btn active" id="army-2" onclick="filterArmy(2)">
+      <div class="army-color" style="background:#3498db;"></div>
+      <span style="font-size:12px;">红二方面军</span>
+    </div>
+    <div class="army-btn active" id="army-4" onclick="filterArmy(4)">
+      <div class="army-color" style="background:#2ecc71;"></div>
+      <span style="font-size:12px;">红四方面军</span>
+    </div>
+  </div>
+
+  <!-- People -->
+  <div class="panel-section">
+    <div class="panel-section-title">👤 人物追踪</div>
+    <div id="people-list">
+      <div class="person-card" onclick="trackPerson('mao')">
+        <div class="person-avatar">毛</div>
+        <div class="person-info">
+          <div class="person-name">毛泽东</div>
+          <div class="person-role">中央政治局委员</div>
+        </div>
+      </div>
+      <div class="person-card" onclick="trackPerson('zhou')">
+        <div class="person-avatar">周</div>
+        <div class="person-info">
+          <div class="person-name">周恩来</div>
+          <div class="person-role">军事三人团成员</div>
+        </div>
+      </div>
+      <div class="person-card" onclick="trackPerson('zhu')">
+        <div class="person-avatar">朱</div>
+        <div class="person-info">
+          <div class="person-name">朱德</div>
+          <div class="person-role">红军总司令</div>
+        </div>
+      </div>
+      <div class="person-card" onclick="trackPerson('peng')">
+        <div class="person-avatar">彭</div>
+        <div class="person-info">
+          <div class="person-name">彭德怀</div>
+          <div class="person-role">红三军团军团长</div>
+        </div>
+      </div>
+      <div class="person-card" onclick="trackPerson('lin')">
+        <div class="person-avatar">林</div>
+        <div class="person-info">
+          <div class="person-name">林彪</div>
+          <div class="person-role">红一军团军团长</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="panel-section">
+    <div class="panel-section-title">📈 长征数据</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div style="text-align:center;padding:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(212,160,23,0.15);border-radius:6px;">
+        <div style="font-family:'Noto Serif SC';font-size:16px;font-weight:700;color:#f39c12;">25000</div>
+        <div style="font-size:10px;color:rgba(232,213,183,0.5);margin-top:2px;">里程 (里)</div>
+      </div>
+      <div style="text-align:center;padding:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(212,160,23,0.15);border-radius:6px;">
+        <div style="font-family:'Noto Serif SC';font-size:16px;font-weight:700;color:#e74c3c;">368</div>
+        <div style="font-size:10px;color:rgba(232,213,183,0.5);margin-top:2px;">天 (天数)</div>
+      </div>
+      <div style="text-align:center;padding:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(212,160,23,0.15);border-radius:6px;">
+        <div style="font-family:'Noto Serif SC';font-size:16px;font-weight:700;color:#3498db;">18</div>
+        <div style="font-size:10px;color:rgba(232,213,183,0.5);margin-top:2px;">山脉翻越</div>
+      </div>
+      <div style="text-align:center;padding:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(212,160,23,0.15);border-radius:6px;">
+        <div style="font-family:'Noto Serif SC';font-size:16px;font-weight:700;color:#2ecc71;">24</div>
+        <div style="font-size:10px;color:rgba(232,213,183,0.5);margin-top:2px;">河流渡越</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MAP -->
+<div id="map"></div>
+
+<!-- LEGEND -->
+<div id="legend">
+  <div class="legend-title">图 例</div>
+  <div class="legend-item">
+    <div class="legend-line" style="background:#e74c3c;"></div>
+    <span>红一方面军</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-line" style="background:#3498db;"></div>
+    <span>红二方面军</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-line" style="background:#2ecc71;"></div>
+    <span>红四方面军</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background:#f39c12;border:2px solid white;"></div>
+    <span>重要事件</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background:#e74c3c;border:2px solid white;"></div>
+    <span>战役地点</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot" style="background:#27ae60;border:2px solid white;"></div>
+    <span>地理要素</span>
+  </div>
+</div>
+
+<!-- TIMELINE -->
+<div id="timeline-panel">
+  <div class="timeline-header">
+    <span class="timeline-title">⏱ 时间轴 · TIMELINE</span>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div class="timeline-date" id="current-date">1934年10月16日</div>
+      <div class="timeline-controls">
+        <button class="ctrl-btn" onclick="timelinePlay()">▶ 播放</button>
+        <button class="ctrl-btn" onclick="timelinePause()">⏸ 暂停</button>
+        <button class="ctrl-btn" onclick="timelineReset()">↺ 重置</button>
+      </div>
+    </div>
+  </div>
+  <div class="timeline-track" id="timeline-track" onclick="handleTimelineClick(event)">
+    <div class="timeline-fill" id="timeline-fill" style="width:0%;"></div>
+    <div class="timeline-thumb" id="timeline-thumb" style="left:0%;"></div>
+  </div>
+  <div class="timeline-events" id="timeline-events"></div>
+</div>
+
+<!-- EVENT POPUP OVERLAY -->
+<div class="popup-overlay" id="popup-overlay" onclick="closePopup()"></div>
+
+<!-- EVENT POPUP -->
+<div id="event-popup">
+  <div class="popup-header">
+    <div>
+      <div class="popup-title" id="popup-title"></div>
+      <div class="popup-meta" id="popup-meta"></div>
+    </div>
+    <button class="popup-close" onclick="closePopup()">✕</button>
+  </div>
+  <div class="popup-body" id="popup-body"></div>
+</div>
+
+<!-- BATTLE MODAL -->
+<div id="battle-modal">
+  <div class="battle-content">
+    <div class="battle-header">
+      <div class="battle-title" id="battle-title"></div>
+      <div class="battle-subtitle">互动战役模拟 · BATTLE SIMULATION</div>
+    </div>
+    <div class="battle-body" id="battle-body"></div>
+    <button class="battle-close" onclick="closeBattle()">关闭模拟</button>
+  </div>
+</div>
+
+<!-- TECH PANEL -->
+<div id="tech-panel">
+  <div style="max-width:1200px;margin:0 auto;">
+
+    <div class="section-heading">🛠️ 长征数字地图 · 完整技术方案</div>
+    <div class="section-sub">TECHNICAL ARCHITECTURE & DATA STRUCTURE SPECIFICATION</div>
+
+    <div class="tech-grid">
+
+      <div class="tech-card">
+        <div class="tech-card-icon">🗺️</div>
+        <div class="tech-card-title">Layer 1 · 底图层 (Base Map)</div>
+        <div class="tech-card-content">
+          <b>推荐方案：</b>Leaflet.js + OpenStreetMap / 天地图<br><br>
+          <b>技术选型理由：</b><br>
+          • Leaflet 轻量级（42KB gzipped），适合教育场景<br>
+          • 支持多底图切换：标准地图 / 卫星影像 / 历史地图<br>
+          • 高德地图API可提供中文地名标注<br>
+          • Mapbox GL JS 可实现3D地形效果<br><br>
+          <b>数据格式：</b>
+          <span class="tech-tag">TileLayer</span>
+          <span class="tech-tag">WMS</span>
+          <span class="tech-tag">XYZ Tiles</span>
+        </div>
+        <div class="code-block">
+<span class="code-comment">// 底图配置示例</span>
+{
+  <span class="code-key">"baseMap"</span>: {
+    <span class="code-key">"type"</span>: <span class="code-string">"TileLayer"</span>,
+    <span class="code-key">"url"</span>: <span class="code-string">"天地图API"</span>,
+    <span class="code-key">"attribution"</span>: <span class="code-string">"©天地图"</span>,
+    <span class="code-key">"maxZoom"</span>: <span class="code-num">18</span>,
+    <span class="code-key">"minZoom"</span>: <span class="code-num">4</span>
+  }
+}</div>
+      </div>
+
+      <div class="tech-card">
+        <div class="tech-card-icon">📍</div>
+        <div class="tech-card-title">Layer 2 · 线路层 (Routes Layer)</div>
+        <div class="tech-card-content">
+          <b>数据格式：</b>GeoJSON LineString<br><br>
+          <b>三大方面军路线：</b><br>
+          • 红一方面军：江西瑞金→陕西吴起（红色 #e74c3c）<br>
+          • 红二方面军：湖南桑植→甘肃会宁（蓝色 #3498db）<br>
+          • 红四方面军：四川→甘肃（绿色 #2ecc71）<br><br>
+          <b>路线属性：</b>
+          <span class="tech-tag">army_id</span>
+          <span class="tech-tag">start_date</span>
+          <span class="tech-tag">end_date</span>
+          <span class="tech-tag">distance_km</span>
+        </div>
+        <div class="code-block">
+{
+  <span class="code-key">"type"</span>: <span class="code-string">"FeatureCollection"</span>,
+  <span class="code-key">"features"</span>: [{
+    <span class="code-key">"type"</span>: <span class="code-string">"Feature"</span>,
+    <span class="code-key">"geometry"</span>: {
+      <span class="code-key">"type"</span>: <span class="code-string">"LineString"</span>,
+      <span class="code-key">"coordinates"</span>: [
+        [<span class="code-num">116.03</span>, <span class="code-num">25.88</span>],<span class="code-comment">// 瑞金</span>
+        [<span class="code-num">106.93</span>, <span class="code-num">27.69</span>] <span class="code-comment">// 遵义</span>
+      ]
+    },
+    <span class="code-key">"properties"</span>: {
+      <span class="code-key">"army"</span>: <span class="code-string">"第一方面军"</span>,
+      <span class="code-key">"color"</span>: <span class="code-string">"#e74c3c"</span>,
+      <span class="code-key">"weight"</span>: <span class="code-num">3</span>
+    }
+  }]
+}</div>
+      </div>
+
+      <div class="tech-card">
+        <div class="tech-card-icon">📅</div>
+        <div class="tech-card-title">Layer 3 · 事件层 (Events Layer)</div>
+        <div class="tech-card-content">
+          <b>数据格式：</b>GeoJSON Point + MongoDB / JSON<br><br>
+          <b>事件分类：</b><br>
+          • 🔴 重要战役 (battle)<br>
+          • 🟡 重要会议 (conference)<br>
+          • 🔵 重要渡口/关隘 (geography)<br>
+          • 🟣 重要会师 (reunion)<br><br>
+          <b>字段结构：</b>
+          <span class="tech-tag">event_id</span>
+          <span class="tech-tag">title</span>
+          <span class="tech-tag">date</span>
+          <span class="tech-tag">location</span>
+          <span class="tech-tag">description</span>
+          <span class="tech-tag">images[]</span>
+          <span class="tech-tag">significance</span>
+        </div>
+        <div class="code-block">
+{
+  <span class="code-key">"event_id"</span>: <span class="code-string">"EVT_001"</span>,
+  <span class="code-key">"title"</span>: <span class="code-string">"遵义会议"</span>,
+  <span class="code-key">"date"</span>: <span class="code-string">"1935-01-15"</span>,
+  <span class="code-key">"coordinates"</span>: [<span class="code-num">106.93</span>, <span class="code-num">27.69</span>],
+  <span class="code-key">"type"</span>: <span class="code-string">"conference"</span>,
+  <span class="code-key">"army"</span>: <span class="code-num">1</span>,
+  <span class="code-key">"images"</span>: [<span class="code-string">"url1"</span>, <span class="code-string">"url2"</span>],
+  <span class="code-key">"significance"</span>: <span class="code-string">"生死攸关的转折点"</span>,
+  <span class="code-key">"tags"</span>: [<span class="code-string">"转折点"</span>, <span class="code-string">"毛泽东"</span>]
+}</div>
+      </div>
+
+      <div class="tech-card">
+        <div class="tech-card-icon">🏔️</div>
+        <div class="tech-card-title">Layer 4 · 地理层 (Geography Layer)</div>
+        <div class="tech-card-content">
+          <b>数据格式：</b>GeoTIFF / DEM / Terrain RGB<br><br>
+          <b>地理要素：</b><br>
+          • 山脉：夹金山、岷山、六盘山<br>
+          • 河流：湘江、乌江、赤水河、金沙江、大渡河<br>
+          • 高原：川西高原、若尔盖草地<br>
+          • 关隘：娄山关、腊子口<br><br>
+          <b>技术实现：</b>
+          <span class="tech-tag">DEM数据</span>
+          <span class="tech-tag">等高线</span>
+          <span class="tech-tag">Mapbox Terrain</span>
+          <span class="tech-tag">3D地形</span>
+        </div>
+        <div class="code-block">
+{
+  <span class="code-key">"geography_id"</span>: <span class="code-string">"GEO_001"</span>,
+  <span class="code-key">"name"</span>: <span class="code-string">"夹金山"</span>,
+  <span class="code-key">"type"</span>: <span class="code-string">"mountain"</span>,
+  <span class="code-key">"elevation"</span>: <span class="code-num">4114</span>,
+  <span class="code-key">"crossed_date"</span>: <span class="code-string">"1935-06-12"</span>,
+  <span class="code-key">"difficulty"</span>: <span class="code-string">"极高"</span>,
+  <span class="code-key">"casualties"</span>: <span class="code-string">"冻伤无数"</span>,
+  <span class="code-key">"polygon"</span>: {<span class="code-key">"type"</span>: <span class="code-string">"Polygon"</span>}
+}</div>
+      </div>
+
+      <div class="tech-card">
+        <div class="tech-card-icon">👤</div>
+        <div class="tech-card-title">Layer 5 · 人物层 (People Layer)</div>
+        <div class="tech-card-content">
+          <b>数据格式：</b>GeoJSON FeatureCollection (时序点集)<br><br>
+          <b>主要人物：</b><br>
+          • 毛泽东 / 周恩来 / 朱德 / 彭德怀<br>
+          • 林彪 / 刘少奇 / 邓小平 / 陈云<br><br>
+          <b>轨迹字段：</b>
+          <span class="tech-tag">person_id</span>
+          <span class="tech-tag">trajectory[]</span>
+          <span class="tech-tag">role</span>
+          <span class="tech-tag">key_events[]</span>
+        </div>
+        <div class="code-block">
+{
+  <span class="code-key">"person_id"</span>: <span class="code-string">"P001"</span>,
+  <span class="code-key">"name"</span>: <span class="code-string">"毛泽东"</span>,
+  <span class="code-key">"role"</span>: <span class="code-string">"中央政治局委员"</span>,
+  <span class="code-key">"trajectory"</span>: [
+    {
+      <span class="code-key">"date"</span>: <span class="code-string">"1934-10-16"</span>,
+      <span class="code-key">"location"</span>: [<span class="code-num">116.03</span>,<span class="code-num">25.88</span>],
+      <span class="code-key">"event"</span>: <span class="code-string">"长征开始"</span>
+    }
+  ]
+}</div>
+      </div>
+
+      <div class="tech-card">
+        <div class="tech-card-icon">⚔️</div>
+        <div class="tech-card-title">Layer 6 · 战役层 (Battles Layer)</div>
+        <div class="tech-card-content">
+          <b>数据格式：</b>JSON + SVG Animation<br><br>
+          <b>主要战役：</b><br>
+          • 湘江战役 (1934.11) - 最惨烈<br>
+          • 四渡赤水 (1935.1-3) - 最精彩<br>
+          • 飞夺泸定桥 (1935.5.29) - 最传奇<br>
+          • 直罗镇战役 (1935.11)<br><br>
+          <b>战役字段：</b>
+          <span class="tech-tag">battle_id</span>
+          <span class="tech-tag">phases[]</span>
+          <span class="tech-tag">forces</span>
+          <span class="tech-tag">outcome</span>
+          <span class="tech-tag">significance</span>
+        </div>
+        <div class="code-block">
+{
+  <span class="code-key">"battle_id"</span>: <span class="code-string">"B002"</span>,
+  <span class="code-key">"name"</span>: <span class="code-string">"四渡赤水"</span>,
+  <span class="code-key">"period"</span>: <span class="code-string">"1935-01至03"</span>,
+  <span class="code-key">"phases"</span>: [
+    {<span class="code-key">"phase"</span>:<span class="code-num">1</span>, <span class="code-key">"date"</span>:<span class="code-string">"1935-01-29"</span>},
+    {<span class="code-key">"phase"</span>:<span class="code-num">2</span>, <span class="code-key">"date"</span>:<span class="code-string">"1935-02-18"</span>}
+  ],
+  <span class="code-key">"red_army"</span>: <span class="code-num">30000</span>,
+  <span class="code-key">"enemy"</span>: <span class="code-num">400000</span>,
+  <span class="code-key">"outcome"</span>: <span class="code-string">"红军成功突围"</span>
+}</div>
+      </div>
+
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- DATA CHECKLIST -->
+    <div class="section-heading" id="data-section">📊 完整数据清单</div>
+    <div class="section-sub">PROJECT DATA INVENTORY</div>
+
+    <div style="overflow-x:auto;margin-bottom:30px;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>数据项</th>
+            <th>格式</th>
+            <th>来源</th>
+            <th>优先级</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>红一方面军路线坐标</td><td>GeoJSON LineString</td><td>中国历史地图集 / 历史档案</td><td style="color:#e74c3c;">●● 高</td><td>逐县级精度，约300+坐标点</td></tr>
+          <tr><td>红二方面军路线坐标</td><td>GeoJSON LineString</td><td>党史研究室资料</td><td style="color:#e74c3c;">●● 高</td><td>贺龙、任弼时率领，1935.11出发</td></tr>
+          <tr><td>红四方面军路线坐标</td><td>GeoJSON LineString</td><td>党史研究室资料</td><td style="color:#e74c3c;">●● 高</td><td>张国焘、徐向前率领</td></tr>
+          <tr><td>重要事件坐标点</td><td>GeoJSON Point</td><td>党史研究室 / 遵义会议纪念馆</td><td style="color:#e74c3c;">●● 高</td><td>含遵义会议、湘江战役等20+事件</td></tr>
+          <tr><td>地形数据DEM</td><td>GeoTIFF</td><td>NASA SRTM / ASTER GDEM</td><td style="color:#f39c12;">● 中</td><td>90m精度，覆盖长征区域</td></tr>
+          <tr><td>历史老照片</td><td>JPEG/PNG</td><td>Wikimedia Commons / 国家博物馆</td><td style="color:#e74c3c;">●● 高</td><td>CC授权，注明来源</td></tr>
+          <tr><td>战役兵力数据</td><td>JSON</td><td>军事科学院长征史料</td><td style="color:#f39c12;">● 中</td><td>含双方兵力、伤亡、结果</td></tr>
+          <tr><td>人物传记数据</td><td>JSON</td><td>人民出版社党史资料</td><td style="color:#f39c12;">● 中</td><td>含主要将领生平和职务</td></tr>
+          <tr><td>红色歌曲音频</td><td>MP3</td><td>网易云音乐 / 党建网资源</td><td style="color:#95a5a6;">○ 低</td><td>《长征组歌》《七律·长征》朗诵等</td></tr>
+          <tr><td>遗址现代照片</td><td>JPEG</td><td>各地博物馆官网 / 文物局</td><td style="color:#f39c12;">● 中</td><td>含泸定桥、娄山关、草地等现代图</td></tr>
+          <tr><td>省市行政边界</td><td>GeoJSON Polygon</td><td>全国地理信息资源目录服务系统</td><td style="color:#f39c12;">● 中</td><td>1930s历史行政边界（与现代有差异）</td></tr>
+          <tr><td>河流山脉矢量</td><td>GeoJSON</td><td>Natural Earth / 中国基础地理信息</td><td style="color:#f39c12;">● 中</td><td>金沙江、大渡河、夹金山等</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- DATA SOURCES -->
+    <div class="section-heading">📚 权威数据来源</div>
+    <div class="section-sub">AUTHORITATIVE DATA SOURCES</div>
+    <div class="tech-grid" style="margin-bottom:30px;">
+      <div class="tech-card">
+        <div class="tech-card-icon">🏛️</div>
+        <div class="tech-card-title">历史文献来源</div>
+        <div class="tech-card-content">
+          • <b>中共中央党史研究室</b>：《中国共产党历史》第一卷<br>
+          • <b>军事科学院</b>：《中国人民解放军战史》<br>
+          • <b>《红星照耀中国》</b>：埃德加·斯诺，一手资料<br>
+          • <b>遵义会议纪念馆</b>官方数字资源<br>
+          • <b>国家档案局</b>：长征相关历史档案<br>
+          • <b>人民出版社</b>：《毛泽东年谱》《朱德年谱》
+        </div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-card-icon">🌐</div>
+        <div class="tech-card-title">地理数据来源</div>
+        <div class="tech-card-content">
+          • <b>NASA SRTM</b>：90m精度DEM地形数据<br>
+          • <b>天地图 (tianditu.gov.cn)</b>：国家级地图服务<br>
+          • <b>全国地理信息资源目录</b>：www.webmap.cn<br>
+          • <b>Natural Earth</b>：自然地理矢量数据<br>
+          • <b>OpenStreetMap</b>：路网、地名数据<br>
+          • <b>高德地图API</b>：精确中文地名编码
+        </div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-card-icon">🖼️</div>
+        <div class="tech-card-title">图片影像来源</div>
+        <div class="tech-card-content">
+          • <b>Wikimedia Commons</b>：开放授权历史图片<br>
+          • <b>中国国家博物馆</b>数字资源库<br>
+          • <b>延安革命纪念馆</b>图片库<br>
+          • <b>遵义会议纪念馆</b>官方授权图片<br>
+          • <b>纪录片《长征》</b>(CCTV)截图（需授权）<br>
+          • <b>Edgar Snow摄影作品</b>（需授权）
+        </div>
+      </div>
+      <div class="tech-card">
+        <div class="tech-card-icon">⚙️</div>
+        <div class="tech-card-title">技术框架推荐</div>
+        <div class="tech-card-content">
+          • <b>地图引擎</b>：Leaflet.js 或 Mapbox GL JS<br>
+          • <b>数据存储</b>：GeoJSON + JSON<br>
+          • <b>3D地形</b>：Cesium.js 或 Mapbox 3D<br>
+          • <b>时间轴</b>：自定义 or TimelineJS<br>
+          • <b>前端框架</b>：React / Vue.js<br>
+          • <b>后端</b>：Node.js + PostgreSQL + PostGIS<br>
+          • <b>部署</b>：CDN + Nginx
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ============================================================
+// DATA
+// ============================================================
+
+const EVENTS_DATA = [
+  {
+    id: 'evt_start',
+    title: '中央红军长征开始',
+    subtitle: '第五次反围剿失利，被迫战略转移',
+    date: '1934-10-16',
+    dateStr: '1934年10月16日',
+    coords: [25.88, 116.03],
+    type: 'start',
+    army: 1,
+    timelinePos: 0,
+    icon: '🚩',
+    color: '#e74c3c',
+    images: [
+      {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Mao_Zedong_1935.jpg/320px-Mao_Zedong_1935.jpg',
+        caption: '长征途中的毛泽东（1935年）'
+      },
+      {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/91/Ruijin.jpg/320px-Ruijin.jpg',
+        caption: '瑞金革命旧址'
+      }
+    ],
+    desc: '1934年10月16日，中央红军（红一方面军）主力8.6万人，从江西瑞金、于都等地出发，踏上漫漫长征路。这是在第五次反围剿失利后，中共中央被迫进行的战略大转移。部队分四路纵队向西突围，突破国民党军队的封锁线，开始了举世闻名的二万五千里长征。',
+    significance: '长征的开始标志着中国革命进入了一个新的历史阶段。面对百万敌军的围追堵截，中国共产党和红军开始了一次改变中国历史命运的伟大壮举，是人类历史上罕见的军事奇迹。',
+    tags: ['长征起点', '瑞金', '第五次反围剿', '战略转移', '红一方面军']
+  },
+  {
+    id: 'evt_xiangjiang',
+    title: '湘江战役',
+    subtitle: '长征中最惨烈的战役',
+    date: '1934-11-25',
+    dateStr: '1934年11月25日—12月1日',
+    coords: [25.46, 110.65],
+    type: 'battle',
+    army: 1,
+    timelinePos: 8,
+    icon: '⚔️',
+    color: '#c0392b',
+    images: [
+      {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Xiang_River_Guilin.jpg/320px-Xiang_River_Guilin.jpg',
+        caption: '湘江（广西境内）'
+      },
+      {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Guangxi_landscape.jpg/320px-Guangxi_landscape.jpg',
+        caption: '湘江战役发生地 广西北部'
+      }
+    ],
+    desc: '1934年11月25日至12月1日，红军在广西兴安、全州、灌阳一带与国民党军队展开生死决战。红军浴血奋战，以巨大牺牲强渡湘江。战役历时七天七夜，红军由出发时的8万余人锐减至3万余人，损失惨重。其中以红34师为代表的部队在掩护主力过江时全军覆没，师长陈树湘壮烈牺牲。',
+    significance: '湘江战役是红军长征中最为惨烈的战役，红军付出了极其沉重的代价才得以突围。这场战役后，红军战士和广大干部对博古、李德等人的错误指挥产生了强烈不满，为遵义会议的召开奠定了思想基础，在历史上具有重要意义。',
+    tags: ['湘江', '惨烈战役', '广西', '红34师', '陈树湘']
+  },
+  {
+    id: 'evt_zunyi',
+    title: '遵义会议',
+    subtitle: '生死攸关的历史转折点',
+    date: '1935-01-15',
+    dateStr: '1935年1月15日—17日',
+    coords: [27.69, 106.93],
+    type: 'conference',
+    army: 1,
+    timelinePos: 22,
+    icon: '🏛️',
+    color: '#f39c12',
+    images: [
+      {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/%E9%81%B5%E4%B9%89%E4%BC%9A%E8%AE%AE%E4%BC%9A%E5%9D%80.jpg/320px-%E9%81%B5%E4%B9%89%E4%BC%9A%E8%AE%AE%E4%BC%9A%E5%9D%80.jpg',
+        caption: '遵义会议会址（贵州遵义）'
+      },
+      {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/%E9%81%B5%E4%B9%89%E4%BC%9A%E8%AE%AE%E6%97%A7%E5%9D%8205232.jpg/320px-%E9%81%B5%E4%B9%89%E4%BC%9A%E8%AE%AE%E6%97%A7%E5%9D%8205232.jpg',
+        caption: '遵义会议旧址建筑外观'
+      },
+      {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/%E9%81%B5%E4%B9%89%E4%BC%9A%E5%9D%8005195.jpg/320px-%E9%81%B5%E4%B9%89%E4%BC%9A%E5%9D%8005195.jpg',
+        caption: '遵义会议旧址大门'
+      }
+    ],
+    desc: '1935年1月15日至17日，中共中央政治局在贵州遵义召开扩大会议（遵义会议）。会议集中全力纠正了博古等人在军事上和组织上的"左"倾错误，肯定了毛泽东的正确军事主张，增选毛泽东为政治局常委，确立了以毛泽东同志为核心的党中央的正确领导。这是中国共产党历史上一个生死攸关的转折点。',
+    significance: '遵义会议是中国共产党第一次独立自主地运用马克思列宁主义基本原理解决自己的路线、方针和政策方面问题的会议，挽救了党、挽救了红军、挽救了中国革命，是中国革命史上的伟大转折点。',
+    tags: ['遵义', '历史转折点', '毛泽东', '政治局扩大会议', '关键会议']
+  },
+  {
+    id: 'evt_zhaxi',
+    title: '扎西会议',
+    subtitle: '遵义会议精神的延续与落实',
+    date: '1935-02-05',
+    dateStr: '1935年2月5日—9日',
+    coords: [27.71, 104.95],
+    type: 'conference',
+    army: 1,
+    timelinePos: 28,
+    icon: '🏛️',
+    color: '#f39c12',
+    images: [
+      {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Zhaxi_Conference_Site.jpg/320px-Zhaxi_Conference_Site.jpg',
+        caption: '扎西会议旧址（云南威信）'
+      }
+    ],
+    desc: '1935年2月5日至9日，中共中央政治局在云南威信（扎西）召开会议，正式确立了张闻天为中央总负责人，完成了中央领导集体的改组。会议还讨论和通过了政治局扩大会议决议的传达决定，部署了红军的战略行动方向，决定回师黔北，四渡赤水河。',
+    significance: '扎西会议是遵义会议的继续，进一步巩固和落实了遵义会议的成果，完成了党的领导核心的改组，为红军下一步军事行动指明了方向。',
+    tags: ['扎西', '云南威信', '张闻天', '中央总负责', '遵义会议延续']
+  },
+  {
+    id: 'evt_sidu',
+    title: '四渡赤水',
+    subtitle: '毛泽东军事生涯的"得意之笔"',
+    date: '1935-01-29',
+    dateStr: '1935年1月29日—3月22日',
+    coords: [28.59, 106.37],
+    type: 'battle',
+    army: 1,
+    timelinePos: 32,
+    icon: '⚔️',
+    color: '#c0392b',
+    images: [
+      {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Chishui_River.jpg/320px-Chishui_River.jpg',
+        caption: '赤水河（贵州赤水）'
+      },
+      {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/Chishui_waterfall.jpg/320px-Chishui_waterfall.jpg',
+        caption: '赤水河流域风光'
+      }
+    ],
+    desc: '从1935年1月29日到3月22日，毛泽东指挥中央红军，在川黔滇边界与国民党数十万大军周旋，先后四次渡过赤水河。一渡赤水：向四川古蔺、叙永进发；二渡赤水：回师遵义，歼灭国军两个师；三渡赤水：虚晃一枪，调动敌人；四渡赤水：南渡乌江，跳出敌人的包围圈。整个战役历时三个多月，共歼灭国民党军1.8万余人。',
+    significance: '四渡赤水是中央红军长征中最具战略意义的行动，毛泽东充分发挥了中国传统兵法中"声东击西""避实就虚"的精髓，以少胜多，成功从几十万国民党军队的重重包围中突围而出，被毛泽东称为其军事生涯中的"得意之笔"。',
+    tags: ['四渡赤水', '赤水河', '毛泽东', '运动战', '以少胜多', '精彩战役'],
+    hasBattle: true,
+    battleId: 'sidu'
+  },
+  {
+    id: 'evt_jinshajiang',
+    title: '巧渡金沙江',
+    subtitle: '彻底摆脱国民党军队追围',
+    date: '1935-05-03',
+    dateStr: '1935年5月3日—9日',
+    coords: [26.56, 103.01],
+    type: 'battle',
+    army: 1,
+    timelinePos: 48,
+    icon: '🌊',
+    color: '#3498db',
+    images: [
+      {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Jinsha_River.jpg/320px-Jinsha_River.jpg',
+        caption: '金沙江（云贵川交界处）'
+      },
+      {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Jinsha_River_gorge.jpg/320px-Jinsha_River_gorge.jpg',
+        caption: '金沙江峡谷险峻地形'
+      }
+    ],
+    desc: '1935年5月3日至9日，中央红军采取调虎离山之计，分三路大军向金沙江挺进。红军先头部队扮成国民党军队，智取皎平渡口，缴获渡船，7天7夜将所有部队和辎重渡过金沙江，然后主动炸毁浮桥。国民党追兵到达时，红军早已全部安全渡过。',
+    significance: '巧渡金沙江是长征中具有决定性意义的军事行动。红军渡过金沙江后，彻底甩脱了国民党几十万军队的围追堵截，取得了长征中具有决定意义的胜利，标志着红军在战略上取得了主动权。',
+    tags: ['金沙江', '巧渡', '皎平渡', '云南', '战略主动']
+  },
+  {
+    id: 'evt_luding',
+    title: '飞夺泸定桥',
+    subtitle: '22名勇士铁索横江的传奇',
+    date: '1935-05-29',
+    dateStr: '1935年5月29日',
+    coords: [29.91, 102.23],
+    type: 'battle',
+    army: 1,
+    timelinePos: 54,
+    icon: '🌉',
+    color: '#c0392b',
+    images: [
+      {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Luding_Bridge_June_07_350D_127.jpg/320px-Luding_Bridge_June_07_350D_127.jpg',
+        caption: '泸定桥（大渡河上的铁索桥）'
+      },
+      {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Long_March_Through_Sichuan_Luding_Bridge_%289958483594%29.jpg/320px-Long_March_Through_Sichuan_Luding_Bridge_%289958483594%29.jpg',
+        caption: '泸定桥博物馆 · 红军夺桥展示'
+      },
+      {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Long_March_Through_Sichuan_Chain_from_Luding_Bridge_%289958484584%29.jpg/320px-Long_March_Through_Sichuan_Chain_from_Luding_Bridge_%289958484584%29.jpg',
+        caption: '红军夺桥时使用的铁链原件'
+      }
+    ],
+    desc: '1935年5月25日，红军强渡大渡河后，面临国民党军队重重封堵。5月29日，红四团22名突击队员组成突击队，在弹雨中抓着13根铁链，爬过大渡河上的泸定桥，铁索横江，英勇夺桥。在此之前，红四团完成了一昼夜240里的急行军。夺桥成功后，大部队得以安全通过。',
+    significance: '飞夺泸定桥是红军长征中最具传奇色彩的战斗之一。22名勇士用血肉之躯突破敌人的火力封锁，保证了红军主力的安全转移。这次战斗充分体现了红军战士大无畏的革命精神和英勇顽强的战斗意志。',
+    tags: ['泸定桥', '大渡河', '22勇士', '铁索桥', '飞夺', '四川泸定'],
+    hasBattle: true,
+    battleId: 'luding'
+  },
+  {
+    id: 'evt_xueshan',
+    title: '翻越夹金山',
+    subtitle: '长征中首座翻越的雪山',
+    date: '1935-06-12',
+    dateStr: '1935年6月12日',
+    coords: [30.83, 102.49],
+    type: 'geography',
+    army: 1,
+    timelinePos: 60,
+    icon: '🏔️',
+    color: '#3498db',
+    images: [
+      {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Jiajin_Mountain.jpg/320px-Jiajin_Mountain.jpg',
+        caption: '夹金山（海拔4114米）'
+      },
+      {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/Sichuan_snow_mountain.jpg/320px-Sichuan_snow_mountain.jpg',
+        caption: '四川西部雪山地貌'
+      }
+    ],
+    desc: '1935年6月12日，中央红军翻越了长征中第一座大雪山——夹金山（海拔4114米）。当时正值盛夏，但山顶积雪终年不化，气温极低，高原反应严重。许多战士因为缺乏保暖衣物和粮食，在翻山途中冻死、饿死。这是红军翻越的18座雪山中的第一座，也是与红四方面军会合的前夕。',
+    significance: '翻越雪山是长征中克服恶劣自然环境的重要象征。红军在极其艰苦的条件下翻越了多座海拔超过4000米的雪山，展现了革命战士超人的意志力和顽强的生命力，成为长征精神的重要组成部分。',
+    tags: ['夹金山', '雪山', '自然天险', '四川', '海拔4114米']
+  },
+  {
+    id: 'evt_caodi',
+    title: '过草地',
+    subtitle: '生命禁区的七日煎熬',
+    date: '1935-08-21',
+    dateStr: '1935年8月21日—31日',
+    coords: [33.58, 102.48],
+    type: 'geography',
+    army: 1,
+    timelinePos: 72,
+    icon: '🌿',
+    color: '#27ae60',
+    images: [
+      {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Ruoergai_grassland.jpg/320px-Ruoergai_grassland.jpg',
+        caption: '若尔盖草原（大草地）现貌'
+      },
+      {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/Zoige_County.jpg/320px-Zoige_County.jpg',
+        caption: '川西北若尔盖湿地草地'
+      }
+    ],
+    desc: '1935年8月21日至31日，中央红军进入了号称"死亡地带"的若尔盖草地（大草地）。草地总面积约1.52万平方公里，一望无际，遍地是泥泞的沼泽地，松软的草皮下是深不见底的泥潭。气候多变，时常下雨和冰雹。红军战士几乎断粮，以野草、树皮、皮带充饥。许多战士陷入沼泽再也没能出来。',
+    significance: '过草地是长征中自然环境最为严酷的考验。红军在与天地的搏斗中，展现了对共产主义事业的无比坚定信念。毛泽东的诗词"更喜岷山千里雪，三军过后尽开颜"正是写于这段艰难岁月之后，成为长征精神的重要组成部分。',
+    tags: ['草地', '若尔盖', '大草地', '沼泽', '生命禁区', '川甘边界']
+  },
+  {
+    id: 'evt_lazikou',
+    title: '夺取腊子口',
+    subtitle: '天险难不倒英雄红军',
+    date: '1935-09-16',
+    dateStr: '1935年9月16日',
+    coords: [34.49, 103.68],
+    type: 'battle',
+    army: 1,
+    timelinePos: 80,
+    icon: '⚔️',
+    color: '#c0392b',
+    images: [
+      {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9f/Lazikou_Pass.jpg/320px-Lazikou_Pass.jpg',
+        caption: '腊子口关隘（甘肃迭部）'
+      }
+    ],
+    desc: '1935年9月16日，红军一师二团夜袭腊子口。腊子口是进入甘肃的咽喉要道，两边高山峭壁，中间是湍急的腊子河，只有一座木桥可以通过，易守难攻。国民党军队凭险据守，企图将红军堵死在草地。红军战士在正面强攻的同时，一个苗族战士"云贵川"率小分队从悬崖攀爬迂回，前后夹击，最终攻破腊子口。',
+    significance: '夺取腊子口打开了红军进入甘肃腹地的通道，是红军进入陕甘根据地的最后一道天险。此战之后，红军迅速北上，进入哈达铺，得知了陕北根据地的存在，最终确定了长征的目的地。',
+    tags: ['腊子口', '天险', '甘肃迭部', '苗族战士', '夜袭']
+  },
+  {
+    id: 'evt_wuqi',
+    title: '吴起镇会师',
+    subtitle: '红一方面军长征胜利结束',
+    date: '1935-10-19',
+    dateStr: '1935年10月19日',
+    coords: [36.92, 108.18],
+    type: 'reunion',
+    army: 1,
+    timelinePos: 90,
+    icon: '🎉',
+    color: '#27ae60',
+    images: [
+      {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/Wuqi_County.jpg/320px-Wuqi_County.jpg',
+        caption: '吴起县（原吴起镇，陕西延安）'
+      },
+      {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Red_Army_Arrives_Wuqi.jpg/320px-Red_Army_Arrives_Wuqi.jpg',
+        caption: '红军到达吴起镇纪念雕塑'
+      }
+    ],
+    desc: '1935年10月19日，中央红军（陕甘支队）到达陕北吴起镇（今陕西省延安市吴起县），与陕北红军胜利会师。10月22日，中共中央正式宣布红一方面军长征胜利结束。历时368天，行程约二万五千里，红军从出发时的8万余人到达陕北时仅剩约7000人，但他们的到来，为中国革命保留了宝贵的革命火种。',
+    significance: '吴起镇会师标志着红一方面军长征的胜利结束，也标志着中国共产党的战略重心转移到陕北。从这里出发，中国共产党开始了新的历史征程，最终走向了抗日战争和解放战争的胜利，建立了新中国。',
+    tags: ['吴起镇', '长征结束', '陕北', '陕甘支队', '革命胜利']
+  },
+  {
+    id: 'evt_huining',
+    title: '三大主力会宁会师',
+    subtitle: '长征的最终胜利',
+    date: '1936-10-22',
+    dateStr: '1936年10月22日',
+    coords: [35.92, 104.68],
+    type: 'reunion',
+    army: 1,
+    timelinePos: 100,
+    icon: '🎊',
+    color: '#f1c40f',
+    images: [
+      {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/Huining_County.jpg/320px-Huining_County.jpg',
+        caption: '会宁县（甘肃白银）会师纪念地'
+      },
+      {
+        url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Huining_Red_Army_Meeting_Site.jpg/320px-Huining_Red_Army_Meeting_Site.jpg',
+        caption: '红军三大主力会师纪念馆'
+      }
+    ],
+    desc: '1936年10月，红军三大主力（红一方面军、红二方面军、红四方面军）在甘肃会宁胜利会师，宣告了长征的最终胜利。三大主力红军从1934年至1936年，先后进行了艰苦卓绝的长征，在极端恶劣的条件下，战胜了数不清的艰难险阻，创造了世界军事史上的奇迹。',
+    significance: '三大主力会师是中国革命史上的重大历史事件，标志着长征的完全胜利。从此，中国共产党领导的革命力量有了完整的战略格局，为下一步的抗日民族解放战争和最终的革命胜利奠定了坚实基础，具有深远的历史意义。',
+    tags: ['会宁', '三大主力会师', '甘肃', '长征最终胜利', '历史壮举']
+  }
+];
+
+// Route data (simplified coordinates for Long March)
+const ROUTES = {
+  army1: {
+    color: '#e74c3c',
+    weight: 3,
+    name: '红一方面军',
+    coords: [
+      [25.88, 116.03], [25.40, 114.90], [24.98, 113.50],
+      [25.46, 110.65], [26.30, 108.50], [27.69, 106.93],
+      [27.71, 104.95], [28.59, 106.37], [27.50, 104.80],
+      [26.56, 103.01], [28.10, 102.80], [29.91, 102.23],
+      [30.83, 102.49], [31.90, 102.42], [33.58, 102.48],
+      [34.49, 103.68], [35.50, 105.30], [36.92, 108.18]
+    ]
+  },
+  army2: {
+    color: '#3498db',
+    weight: 2.5,
+    name: '红二方面军',
+    coords: [
+      [29.40, 110.20], [28.30, 109.50], [27.80, 108.40],
+      [27.10, 107.50], [26.50, 106.40], [27.00, 105.20],
+      [26.80, 104.50], [25.90, 103.80], [26.30, 102.20],
+      [27.50, 101.50], [29.00, 100.20], [31.50, 100.80],
+      [34.00, 103.50], [35.90, 104.68]
+    ]
+  },
+  army4: {
+    color: '#2ecc71',
+    weight: 2.5,
+    name: '红四方面军',
+    coords: [
+      [32.00, 107.50], [31.50, 105.80], [30.80, 103.50],
+      [31.90, 102.42], [33.00, 102.80], [34.00, 103.50],
+      [35.90, 104.68]
+    ]
+  }
+};
+
+const GEOGRAPHY_DATA = [
+  { id: 'geo_xiangjiang', name: '湘江', type: 'river', coords: [25.46, 110.65], icon: '🌊' },
+  { id: 'geo_wujiang', name: '乌江天险', type: 'river', coords: [27.10, 107.30], icon: '🌊' },
+  { id: 'geo_jinsha', name: '金沙江', type: 'river', coords: [26.56, 103.01], icon: '🌊' },
+  { id: 'geo_dadu', name: '大渡河', type: 'river', coords: [29.50, 102.00], icon: '🌊' },
+  { id: 'geo_jiajin', name: '夹金山', type: 'mountain', coords: [30.83, 102.49], icon: '🏔️' },
+  { id: 'geo_minshan', name: '岷山', type: 'mountain', coords: [33.00, 104.00], icon: '🏔️' },
+  { id: 'geo_liupan', name: '六盘山', type: 'mountain', coords: [35.60, 106.20], icon: '🏔️' },
+  { id: 'geo_caodi', name: '若尔盖草地', type: 'grassland', coords: [33.58, 102.48], icon: '🌿' },
+  { id: 'geo_loushan', name: '娄山关', type: 'pass', coords: [28.10, 106.80], icon: '🗻' },
+  { id: 'geo_lazikou', name: '腊子口', type: 'pass', coords: [34.49, 103.68], icon: '🗻' }
+];
+
+const BATTLES_DATA = {
+  sidu: {
+    title: '四渡赤水之战',
+    period: '1935年1月29日 — 3月22日',
+    location: '川黔滇边界赤水河流域',
+    redArmy: '约3万人（中央红军主力）',
+    enemy: '约40万人（国民党军队）',
+    phases: [
+      { phase: 1, title: '一渡赤水', date: '1935年1月29日', desc: '红军从元厚、土城向四川古蔺、叙永地区挺进，渡过赤水河，避开国民党军队的合围。' },
+      { phase: 2, title: '二渡赤水', date: '1935年2月18日—20日', desc: '红军折回向东，再次渡过赤水河，回师遵义，歼敌两个师八个团，歼敌近3000人，取得长征以来最大的一次胜利。' },
+      { phase: 3, title: '三渡赤水', date: '1935年3月16日—17日', desc: '红军第三次渡过赤水河，向古蔺、叙永方向挺进，将大量国民党军队引向川南，为下一步行动创造条件。' },
+      { phase: 4, title: '四渡赤水', date: '1935年3月21日—22日', desc: '红军挥师南进，第四次渡过赤水河，迅速南渡乌江，直逼贵阳，把国民党追击部队远远地甩在乌江北岸，成功跳出重围。' }
+    ],
+    outcome: '红军成功从数十万国民党军队的重重包围中突围，转危为安，取得战略主动权。',
+    significance: '被毛泽东称为他军事生涯中的"得意之笔"，体现了灵活机动的战略战术，是运动战的经典范例。'
+  },
+  luding: {
+    title: '飞夺泸定桥',
+    period: '1935年5月29日',
+    location: '四川泸定县大渡河',
+    redArmy: '红四团22名突击队员',
+    enemy: '国民党川军一个营守桥',
+    phases: [
+      { phase: 1, title: '急行军240里', date: '5月28日夜间', desc: '红四团接到命令，在一昼夜内急行军240里，赶到泸定桥西岸。战士们在崎岖山路上冒雨行军，不顾疲劳，按时抵达。' },
+      { phase: 2, title: '组建突击队', date: '5月29日下午4时', desc: '22名勇士组成突击队，手持冲锋枪、手榴弹，准备强攻。国民党军已将桥上木板撤除，只剩13根铁链悬挂在大渡河上。' },
+      { phase: 3, title: '铁索横渡', date: '5月29日下午4时—6时', desc: '22名勇士在密集炮火支援下，冒着枪林弹雨，抓住铁链，匍匐向前。先锋战士中弹后坠入江中，后续战士踏着牺牲者继续前进。' },
+      { phase: 4, title: '夺桥成功', date: '5月29日傍晚', desc: '突击队员抵达对岸，与东岸部队夹击，歼灭守桥敌军，成功夺取泸定桥。大部队随即通过，全军安全渡过大渡河。' }
+    ],
+    outcome: '红军成功夺取泸定桥，主力部队安全渡过大渡河，避免了重蹈石达开全军覆没的命运。',
+    significance: '飞夺泸定桥是长征中最具传奇性的战斗，22名勇士的英雄壮举成为中国革命精神的重要象征。'
+  }
+};
+
+// ============================================================
+// MAP & APP STATE
+// ============================================================
+
+let map, layers = {}, markers = [], routeLines = [];
+let currentArmies = new Set([1, 2, 4]);
+let layerState = { routes: true, events: true, battles: true, people: false, geography: true };
+let timelineTimer = null;
+let currentTimelinePos = 0;
+let selectedPerson = null;
+let personLayer = null;
+
+const TIMELINE_EVENTS = EVENTS_DATA
+  .filter(e => e.timelinePos !== undefined)
+  .sort((a,b) => a.timelinePos - b.timelinePos);
+
+// ============================================================
+// INIT
+// ============================================================
+
+window.addEventListener('load', () => {
+  // Create loader stars
+  const starsContainer = document.getElementById('loader-stars');
+  for (let i = 0; i < 80; i++) {
+    const star = document.createElement('div');
+    star.className = 'star';
+    star.style.left = Math.random() * 100 + '%';
+    star.style.top = Math.random() * 100 + '%';
+    star.style.animationDelay = Math.random() * 3 + 's';
+    star.style.animationDuration = (2 + Math.random() * 3) + 's';
+    starsContainer.appendChild(star);
+  }
+
+  setTimeout(() => {
+    document.getElementById('loader').style.opacity = '0';
+    setTimeout(() => {
+      document.getElementById('loader').style.display = 'none';
+    }, 500);
+  }, 2000);
+
+  initMap();
+  initTimeline();
+});
+
+function initMap() {
+  map = L.map('map', {
+    center: [29.5, 106.0],
+    zoom: 6,
+    zoomControl: true
+  });
+
+  // Dark themed tile layer
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap contributors © CARTO',
+    subdomains: 'abcd',
+    maxZoom: 19
+  }).addTo(map);
+
+  // Init all layers
+  drawRoutes();
+  drawGeography();
+  drawEvents();
+}
+
+// ============================================================
+// ROUTES
+// ============================================================
+
+function drawRoutes() {
+  // Clear existing
+  routeLines.forEach(l => map.removeLayer(l));
+  routeLines = [];
+
+  if (!layerState.routes) return;
+
+  Object.entries(ROUTES).forEach(([key, route]) => {
+    const armyNum = key === 'army1' ? 1 : key === 'army2' ? 2 : 4;
+    if (!currentArmies.has(armyNum)) return;
+
+    const polyline = L.polyline(route.coords, {
+      color: route.color,
+      weight: route.weight,
+      opacity: 0.85,
+      dashArray: armyNum === 1 ? null : '8, 4',
+      lineJoin: 'round'
+    }).addTo(map);
+
+    // Direction arrows effect via tooltip on hover
+    polyline.bindTooltip(route.name, { sticky: true, className: 'leaflet-tooltip' });
+
+    // Add animated start marker
+    const startCoord = route.coords[0];
+    const endCoord = route.coords[route.coords.length - 1];
+
+    const startIcon = L.divIcon({
+      html: `<div style="width:12px;height:12px;background:${route.color};border:2px solid white;border-radius:50%;box-shadow:0 0 6px ${route.color};"></div>`,
+      className: '',
+      iconSize: [12, 12],
+      iconAnchor: [6, 6]
+    });
+
+    L.marker(startCoord, { icon: startIcon }).addTo(map)
+      .bindTooltip(route.name + '·出发点', { className: 'leaflet-tooltip' });
+
+    routeLines.push(polyline);
+  });
+}
+
+// ============================================================
+// GEOGRAPHY LAYER
+// ============================================================
+
+function drawGeography() {
+  if (layers.geography) {
+    layers.geography.forEach(m => map.removeLayer(m));
+  }
+  layers.geography = [];
+
+  if (!layerState.geography) return;
+
+  GEOGRAPHY_DATA.forEach(geo => {
+    const icon = L.divIcon({
+      html: `<div style="
+        background: rgba(39,174,96,0.85);
+        border: 1.5px solid #2ecc71;
+        border-radius: 4px;
+        padding: 2px 5px;
+        font-size: 11px;
+        color: white;
+        white-space: nowrap;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        display: flex;
+        align-items: center;
+        gap: 3px;
+      ">${geo.icon} ${geo.name}</div>`,
+      className: '',
+      iconSize: null,
+      iconAnchor: [0, 8]
+    });
+
+    const marker = L.marker(geo.coords, { icon }).addTo(map);
+    layers.geography.push(marker);
+  });
+}
+
+// ============================================================
+// EVENTS LAYER
+// ============================================================
+
+function drawEvents() {
+  if (layers.events) {
+    layers.events.forEach(m => map.removeLayer(m));
+  }
+  layers.events = [];
+
+  if (!layerState.events) return;
+
+  EVENTS_DATA.forEach(evt => {
+    if (!currentArmies.has(evt.army)) return;
+
+    const isBattle = evt.type === 'battle';
+    const isConference = evt.type === 'conference';
+    const isReunion = evt.type === 'reunion';
+
+    const bgColor = isBattle ? '#c0392b' : isConference ? '#d4a017' : isReunion ? '#27ae60' : '#3498db';
+
+    const icon = L.divIcon({
+      html: `<div class="custom-icon" style="background:${bgColor};width:30px;height:30px;border:2px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 3px 10px rgba(0,0,0,0.5),0 0 0 3px ${bgColor}40;">${evt.icon}</div>`,
+      className: 'custom-marker',
+      iconSize: [30, 30],
+      iconAnchor: [15, 15]
+    });
+
+    const marker = L.marker(evt.coords, { icon }).addTo(map);
+
+    marker.bindPopup(`
+      <div class="lp-title">${evt.title}</div>
+      <div class="lp-date">📅 ${evt.dateStr}</div>
+      <div class="lp-desc">${evt.desc.substring(0, 100)}...</div>
+      <button class="lp-btn" onclick="showEventDetail('${evt.id}')">查看详情 →</button>
+      ${evt.hasBattle ? `<button class="lp-btn" style="margin-left:6px;background:#8e44ad;" onclick="showBattle('${evt.battleId}')">⚔️ 战役模拟</button>` : ''}
+    `, { maxWidth: 260 });
+
+    marker.bindTooltip(evt.title, { permanent: false, className: 'leaflet-tooltip', direction: 'top' });
+
+    layers.events.push(marker);
+  });
+}
+
+// ============================================================
+// LAYER TOGGLE
+// ============================================================
+
+function toggleLayer(layerName) {
+  layerState[layerName] = !layerState[layerName];
+  const toggle = document.getElementById('toggle-' + layerName);
+  if (toggle) toggle.classList.toggle('on', layerState[layerName]);
+
+  switch(layerName) {
+    case 'routes': drawRoutes(); break;
+    case 'events': case 'battles': drawEvents(); break;
+    case 'geography': drawGeography(); break;
+    case 'people':
+      if (layerState.people && selectedPerson) drawPersonTrack(selectedPerson);
+      else if (!layerState.people && personLayer) {
+        map.removeLayer(personLayer);
+        personLayer = null;
+      }
+      break;
+  }
+}
+
+// ============================================================
+// ARMY FILTER
+// ============================================================
+
+function filterArmy(num) {
+  if (currentArmies.has(num)) {
+    currentArmies.delete(num);
+    document.getElementById('army-' + num).classList.remove('active');
+  } else {
+    currentArmies.add(num);
+    document.getElementById('army-' + num).classList.add('active');
+  }
+  drawRoutes();
+  drawEvents();
+}
+
+// ============================================================
+// PERSON TRACK
+// ============================================================
+
+const PERSON_DATA = {
+  mao: {
+    name: '毛泽东',
+    color: '#e74c3c',
+    points: [
+      { coords: [25.88, 116.03], label: '江西瑞金·长征出发', date: '1934.10.16' },
+      { coords: [27.69, 106.93], label: '贵州遵义·主持遵义会议', date: '1935.01.15' },
+      { coords: [28.59, 106.37], label: '赤水河流域·指挥四渡赤水', date: '1935.02' },
+      { coords: [33.58, 102.48], label: '若尔盖草地·率军过草地', date: '1935.08' },
+      { coords: [36.92, 108.18], label: '陕西吴起镇·宣告长征结束', date: '1935.10.19' }
+    ]
+  },
+  zhou: {
+    name: '周恩来',
+    color: '#3498db',
+    points: [
+      { coords: [25.88, 116.03], label: '江西瑞金·长征出发', date: '1934.10.16' },
+      { coords: [27.69, 106.93], label: '遵义·参加遵义会议', date: '1935.01.15' },
+      { coords: [29.91, 102.23], label: '四川泸定·部署飞夺泸定桥', date: '1935.05.29' },
+      { coords: [36.92, 108.18], label: '吴起镇·长征胜利', date: '1935.10' }
+    ]
+  },
+  zhu: {
+    name: '朱德',
+    color: '#f39c12',
+    points: [
+      { coords: [25.88, 116.03], label: '江西瑞金·出发', date: '1934.10.16' },
+      { coords: [27.69, 106.93], label: '遵义·出席遵义会议', date: '1935.01' },
+      { coords: [26.56, 103.01], label: '云南·巧渡金沙江', date: '1935.05' },
+      { coords: [35.92, 104.68], label: '甘肃会宁·三军会师', date: '1936.10' }
+    ]
+  },
+  peng: {
+    name: '彭德怀',
+    color: '#9b59b6',
+    points: [
+      { coords: [25.88, 116.03], label: '江西瑞金·出发', date: '1934.10.16' },
+      { coords: [25.46, 110.65], label: '广西湘江·湘江战役', date: '1934.11' },
+      { coords: [28.10, 106.80], label: '贵州娄山关·娄山关大捷', date: '1935.02' },
+      { coords: [36.92, 108.18], label: '吴起镇·任陕甘支队司令员', date: '1935.10' }
+    ]
+  },
+  lin: {
+    name: '林彪',
+    color: '#1abc9c',
+    points: [
+      { coords: [25.88, 116.03], label: '江西瑞金·率红一军团出发', date: '1934.10.16' },
+      { coords: [25.46, 110.65], label: '广西湘江·率部突围', date: '1934.11' },
+      { coords: [27.69, 106.93], label: '贵州遵义·参加会议', date: '1935.01' },
+      { coords: [36.92, 108.18], label: '吴起镇·长征结束', date: '1935.10' }
+    ]
+  }
+};
+
+function trackPerson(personId) {
+  // Clear previous person layer
+  if (personLayer) { map.removeLayer(personLayer); personLayer = null; }
+
+  // Deselect if same
+  document.querySelectorAll('.person-card').forEach(c => c.classList.remove('active'));
+  if (selectedPerson === personId) {
+    selectedPerson = null;
+    return;
+  }
+
+  selectedPerson = personId;
+  const cards = document.querySelectorAll('.person-card');
+  const personKeys = Object.keys(PERSON_DATA);
+  const idx = personKeys.indexOf(personId);
+  if (idx >= 0 && cards[idx]) cards[idx].classList.add('active');
+
+  const person = PERSON_DATA[personId];
+  if (!person) return;
+
+  layerState.people = true;
+  document.getElementById('toggle-people').classList.add('on');
+
+  const group = L.layerGroup();
+
+  // Draw trajectory line
+  const coords = person.points.map(p => p.coords);
+  L.polyline(coords, {
+    color: person.color,
+    weight: 2,
+    dashArray: '6, 4',
+    opacity: 0.9
+  }).addTo(group);
+
+  // Draw points
+  person.points.forEach((pt, i) => {
+    const icon = L.divIcon({
+      html: `<div style="background:${person.color};border:2px solid white;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;color:white;font-size:9px;font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,0.5);">${i+1}</div>`,
+      className: '',
+      iconSize: [20, 20],
+      iconAnchor: [10, 10]
+    });
+    L.marker(pt.coords, { icon }).addTo(group)
+      .bindTooltip(`<b>${person.name}</b><br>${pt.label}<br><small>${pt.date}</small>`, { className: 'leaflet-tooltip' });
+  });
+
+  personLayer = group.addTo(map);
+  showNotification(`正在追踪 ${person.name} 的长征轨迹 (${person.points.length}个节点)`);
+
+  // Fit bounds
+  const latlngs = person.points.map(p => L.latLng(p.coords[0], p.coords[1]));
+  map.fitBounds(L.latLngBounds(latlngs), { padding: [40, 40] });
+}
+
+// ============================================================
+// TIMELINE
+// ============================================================
+
+function initTimeline() {
+  const container = document.getElementById('timeline-events');
+  container.innerHTML = '';
+
+  TIMELINE_EVENTS.forEach((evt, i) => {
+    const el = document.createElement('div');
+    el.className = 'tl-event';
+    el.id = 'tl-evt-' + i;
+    el.innerHTML = `<span class="tl-date">${evt.dateStr.substring(0,10)}</span>${evt.title}`;
+    el.onclick = () => jumpToEvent(evt, i);
+    container.appendChild(el);
+  });
+}
+
+function jumpToEvent(evt, idx) {
+  // Update timeline position
+  setTimelinePosition(evt.timelinePos);
+
+  // Highlight
+  document.querySelectorAll('.tl-event').forEach(e => e.classList.remove('active'));
+  const el = document.getElementById('tl-evt-' + idx);
+  if (el) { el.classList.add('active'); el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }); }
+
+  // Fly to location
+  map.flyTo(evt.coords, 8, { duration: 1.2 });
+  showNotification(`${evt.dateStr} · ${evt.title}`);
+}
+
+function setTimelinePosition(pos) {
+  currentTimelinePos = Math.max(0, Math.min(100, pos));
+  document.getElementById('timeline-fill').style.width = currentTimelinePos + '%';
+  document.getElementById('timeline-thumb').style.left = currentTimelinePos + '%';
+
+  // Find current date
+  const sorted = [...TIMELINE_EVENTS].sort((a,b) => a.timelinePos - b.timelinePos);
+  let currentEvt = sorted[0];
+  for (const evt of sorted) {
+    if (evt.timelinePos <= currentTimelinePos) currentEvt = evt;
+  }
+  if (currentEvt) {
+    document.getElementById('current-date').textContent = currentEvt.dateStr;
+  }
+}
+
+function handleTimelineClick(e) {
+  const track = document.getElementById('timeline-track');
+  const rect = track.getBoundingClientRect();
+  const pos = ((e.clientX - rect.left) / rect.width) * 100;
+  setTimelinePosition(pos);
+
+  // Find nearest event
+  const nearest = TIMELINE_EVENTS.reduce((prev, curr) =>
+    Math.abs(curr.timelinePos - pos) < Math.abs(prev.timelinePos - pos) ? curr : prev
+  );
+  if (Math.abs(nearest.timelinePos - pos) < 10) {
+    map.flyTo(nearest.coords, 8, { duration: 1.0 });
+  }
+}
+
+// Timeline drag
+(function() {
+  let dragging = false;
+  const thumb = document.getElementById('timeline-thumb');
+  const track = document.getElementById('timeline-track');
+
+  thumb.addEventListener('mousedown', e => { dragging = true; e.preventDefault(); });
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const rect = track.getBoundingClientRect();
+    const pos = ((e.clientX - rect.left) / rect.width) * 100;
+    setTimelinePosition(pos);
+  });
+  document.addEventListener('mouseup', () => { dragging = false; });
+})();
+
+function timelinePlay() {
+  if (timelineTimer) return;
+  timelineTimer = setInterval(() => {
+    currentTimelinePos += 0.5;
+    if (currentTimelinePos >= 100) {
+      clearInterval(timelineTimer);
+      timelineTimer = null;
+      currentTimelinePos = 100;
+    }
+    setTimelinePosition(currentTimelinePos);
+
+    // Auto-navigate to events
+    const nearest = TIMELINE_EVENTS.find(e => Math.abs(e.timelinePos - currentTimelinePos) < 0.6);
+    if (nearest) {
+      map.flyTo(nearest.coords, 7, { duration: 2.0 });
+    }
+  }, 80);
+  showNotification('长征时间线自动播放中...');
+}
+
+function timelinePause() {
+  if (timelineTimer) { clearInterval(timelineTimer); timelineTimer = null; }
+}
+
+function timelineReset() {
+  timelinePause();
+  setTimelinePosition(0);
+  map.flyTo([29.5, 106.0], 6, { duration: 1.5 });
+  document.querySelectorAll('.tl-event').forEach(e => e.classList.remove('active'));
+}
+
+// ============================================================
+// EVENT DETAIL POPUP
+// ============================================================
+
+function showEventDetail(eventId) {
+  const evt = EVENTS_DATA.find(e => e.id === eventId);
+  if (!evt) return;
+
+  document.getElementById('popup-title').textContent = evt.title;
+
+  document.getElementById('popup-meta').innerHTML = `
+    <span>📅 ${evt.dateStr}</span>
+    <span>📍 ${evt.coords[1].toFixed(2)}°E, ${evt.coords[0].toFixed(2)}°N</span>
+    <span>${evt.type === 'battle' ? '⚔️ 战役' : evt.type === 'conference' ? '🏛️ 会议' : evt.type === 'reunion' ? '🎉 会师' : '📍 事件'}</span>
+  `;
+
+  let bodyHTML = '';
+
+  // Images
+  if (evt.images && evt.images.length > 0) {
+    bodyHTML += `<div class="popup-images">`;
+    evt.images.forEach(img => {
+      bodyHTML += `
+        <div class="popup-img-wrap">
+          <img src="${img.url}" alt="${img.caption}" loading="lazy" onerror="this.parentElement.style.display='none'">
+          <div class="img-caption">${img.caption}</div>
+        </div>`;
+    });
+    bodyHTML += `</div>`;
+  }
+
+  bodyHTML += `<div class="popup-desc">${evt.desc}</div>`;
+
+  bodyHTML += `
+    <div class="popup-significance">
+      <div class="popup-significance-title">★ 历史意义</div>
+      <p>${evt.significance}</p>
+    </div>
+  `;
+
+  if (evt.tags) {
+    bodyHTML += `<div class="popup-tags">`;
+    evt.tags.forEach(tag => {
+      bodyHTML += `<span class="popup-tag">${tag}</span>`;
+    });
+    bodyHTML += `</div>`;
+  }
+
+  if (evt.hasBattle) {
+    bodyHTML += `<div style="margin-top:14px;"><button class="lp-btn" style="background:#8e44ad;padding:8px 16px;font-size:13px;" onclick="closeThenBattle('${evt.battleId}')">⚔️ 进入战役模拟界面</button></div>`;
+  }
+
+  document.getElementById('popup-body').innerHTML = bodyHTML;
+
+  document.getElementById('event-popup').classList.add('show');
+  document.getElementById('popup-overlay').classList.add('show');
+}
+
+function closeThenBattle(battleId) {
+  closePopup();
+  setTimeout(() => showBattle(battleId), 300);
+}
+
+function closePopup() {
+  document.getElementById('event-popup').classList.remove('show');
+  document.getElementById('popup-overlay').classList.remove('show');
+}
+
+// ============================================================
+// BATTLE SIMULATION
+// ============================================================
+
+function showBattle(battleId) {
+  const battle = BATTLES_DATA[battleId];
+  if (!battle) return;
+
+  document.getElementById('battle-title').textContent = battle.title;
+
+  let html = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+      <div style="padding:10px;background:rgba(192,57,43,0.1);border:1px solid rgba(192,57,43,0.3);border-radius:6px;">
+        <div style="font-size:10px;color:#e74c3c;letter-spacing:1px;margin-bottom:4px;">🚩 红军兵力</div>
+        <div style="font-size:13px;color:var(--text-light);">${battle.redArmy}</div>
+      </div>
+      <div style="padding:10px;background:rgba(52,73,94,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;">
+        <div style="font-size:10px;color:#95a5a6;letter-spacing:1px;margin-bottom:4px;">⚠️ 敌军兵力</div>
+        <div style="font-size:13px;color:var(--text-light);">${battle.enemy}</div>
+      </div>
+    </div>
+    <div style="margin-bottom:16px;padding:10px 14px;background:rgba(255,255,255,0.03);border-radius:6px;border-left:3px solid var(--gold);">
+      <div style="font-size:11px;color:var(--gold);margin-bottom:4px;">📍 战役地点 · ${battle.period}</div>
+      <div style="font-size:12px;color:rgba(232,213,183,0.7);">${battle.location}</div>
+    </div>
+    <div style="font-size:11px;color:var(--gold);letter-spacing:1.5px;margin-bottom:10px;">⚔️ 战役经过</div>
+    <div class="battle-steps">
+  `;
+
+  battle.phases.forEach((phase, i) => {
+    html += `
+      <div class="battle-step ${i === 0 ? 'active' : ''}" onclick="selectBattleStep(this)">
+        <div class="step-num">${phase.phase}</div>
+        <div class="step-content">
+          <div class="step-title">${phase.title} <span style="font-size:11px;color:rgba(232,213,183,0.4);font-weight:400;margin-left:6px;">${phase.date}</span></div>
+          <div class="step-desc">${phase.desc}</div>
+        </div>
+      </div>
+    `;
+  });
+
+  html += `</div>
+    <div style="margin-top:16px;padding:12px;background:rgba(39,174,96,0.1);border:1px solid rgba(39,174,96,0.3);border-radius:6px;">
+      <div style="font-size:11px;color:#2ecc71;margin-bottom:6px;">✅ 战役结果</div>
+      <div style="font-size:12px;color:rgba(232,213,183,0.8);">${battle.outcome}</div>
+    </div>
+    <div style="margin-top:10px;padding:12px;background:rgba(212,160,23,0.08);border:1px solid rgba(212,160,23,0.25);border-radius:6px;">
+      <div style="font-size:11px;color:var(--gold);margin-bottom:6px;">★ 历史意义</div>
+      <div style="font-size:12px;color:rgba(232,213,183,0.8);">${battle.significance}</div>
+    </div>
+  `;
+
+  document.getElementById('battle-body').innerHTML = html;
+  document.getElementById('battle-modal').classList.add('show');
+}
+
+function selectBattleStep(el) {
+  document.querySelectorAll('.battle-step').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function closeBattle() {
+  document.getElementById('battle-modal').classList.remove('show');
+}
+
+// ============================================================
+// SEARCH
+// ============================================================
+
+function handleSearch(query) {
+  if (!query || query.length < 1) {
+    drawEvents();
+    return;
+  }
+
+  const q = query.toLowerCase();
+  const results = EVENTS_DATA.filter(evt =>
+    evt.title.includes(query) ||
+    (evt.subtitle && evt.subtitle.includes(query)) ||
+    (evt.tags && evt.tags.some(t => t.includes(query))) ||
+    evt.dateStr.includes(query)
+  );
+
+  if (results.length > 0) {
+    const first = results[0];
+    map.flyTo(first.coords, 8, { duration: 1.2 });
+    showNotification(`找到 ${results.length} 个匹配结果：${results.map(r => r.title).join('、')}`);
+  } else {
+    showNotification('未找到相关内容，请尝试其他关键词');
+  }
+}
+
+// ============================================================
+// VIEW SWITCHER
+// ============================================================
+
+function showView(view) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+
+  const techPanel = document.getElementById('tech-panel');
+  const mapEl = document.getElementById('map');
+  const leftPanel = document.getElementById('left-panel');
+  const legend = document.getElementById('legend');
+
+  if (view === 'map') {
+    techPanel.classList.remove('show');
+    mapEl.style.display = '';
+    leftPanel.style.display = '';
+    legend.style.display = '';
+    document.querySelector('.nav-btn').classList.add('active');
+  } else if (view === 'tech' || view === 'data') {
+    techPanel.classList.add('show');
+    mapEl.style.display = 'none';
+    leftPanel.style.display = 'none';
+    legend.style.display = 'none';
+    if (view === 'data') {
+      setTimeout(() => {
+        document.getElementById('data-section').scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+    document.querySelectorAll('.nav-btn')[view === 'tech' ? 1 : 2].classList.add('active');
+  }
+}
+
+// ============================================================
+// NOTIFICATION
+// ============================================================
+
+function showNotification(msg) {
+  const notif = document.getElementById('notification');
+  notif.textContent = msg;
+  notif.style.display = 'block';
+  clearTimeout(notif._timer);
+  notif._timer = setTimeout(() => { notif.style.display = 'none'; }, 3500);
+}
+
+// ============================================================
+// KEYBOARD SHORTCUTS
+// ============================================================
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closePopup();
+    closeBattle();
+  }
+  if (e.key === ' ' && !e.target.matches('input')) {
+    e.preventDefault();
+    if (timelineTimer) timelinePause(); else timelinePlay();
+  }
+});
+
+// Click outside popup
+document.getElementById('battle-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeBattle();
+});
+</script>
+</body>
+</html>
